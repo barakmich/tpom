@@ -24,6 +24,14 @@ char* MakeSocketName() {
   return socket_name;
 }
 
+char* MakePostHookPath() {
+  char* home = getenv("HOME");
+  char* post_hook =  (char*) calloc(strlen(home) + 40, sizeof(char));
+  strcat(post_hook, home);
+  strcat(post_hook, "/.tpm-post.sh");
+  return post_hook;
+}
+
 int ClientMain(char* done_message) {
   int sock_fd;
   struct sockaddr_un remote;
@@ -153,6 +161,11 @@ int DaemonMain(int countdown_time) {
            ok = nanosleep(&ts, NULL);
         }
    unlink(local.sun_path);
+   char* post_hook = MakePostHookPath();
+   if (access(post_hook, X_OK) != -1) {
+     execv(post_hook, NULL);
+   }
+   free(post_hook);
    exit(EXIT_SUCCESS);
 }
 
