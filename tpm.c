@@ -13,6 +13,7 @@
 #include <unistd.h>
 
 const int kDefaultLengthSecs = 25 * 60;
+const char* kDefaultDoneMessage = "";
 
 char* MakeSocketName() {
   char* username = getenv("USER");
@@ -21,6 +22,34 @@ char* MakeSocketName() {
   strcat(socket_name, "/.tpm-");
   strcat(socket_name, username);
   return socket_name;
+}
+
+int ClientMain(char* done_message) {
+  int sock_fd;
+  struct sockaddr_un remote;
+  if ((sock_fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
+    perror("socket");
+    exit(1);
+  }
+  remote.sun_family = AF_UNIX;
+  char * socket_name = MakeSocketName();
+  strcpy(remote.sun_path, socket_name);
+  free(socket_name);
+
+  int len = strlen(remote.sun_path) + sizeof(remote.sun_family);
+  if (connect(sock_fd, (struct sockaddr *)&remote, len) == -1) {
+    printf("%s\n", done_message);
+    return 0;
+  }
+
+  int recv_length;
+  char buf[100];
+  if ((recv_length = recv(sock_fd, buf, 100, 0)) > 0) {
+    buf[recv_length] = '\0';
+    printf("%s\n", buf);
+  }
+  close(sock_fd);
+  return 0;
 }
 
 int DaemonMain(int countdown_time) {
@@ -130,13 +159,17 @@ int DaemonMain(int countdown_time) {
 int main(int argc, char** argv) {
     int c;
     int countdown_time = kDefaultLengthSecs;
-    while ( (c = getopt(argc, argv, "bsm")) != -1) {
+    char* done_message = (char*) kDefaultDoneMessage;
+    while ( (c = getopt(argc, argv, "bs:m:d:")) != -1) {
         switch (c) {
         case 's':
             countdown_time = atoi(optarg);
             break;
         case 'm':
             countdown_time = atoi(optarg) * 60;
+            break;
+        case 'd':
+            done_message = optarg;
             break;
         }
     }
@@ -146,7 +179,7 @@ int main(int argc, char** argv) {
           DaemonMain(countdown_time);
         }
     } else {
-      return DaemonMain(25);
+      return ClientMain(done_message);
     }
     exit (0);   
 }
