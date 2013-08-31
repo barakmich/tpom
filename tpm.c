@@ -19,7 +19,10 @@ char* MakeSocketName() {
   char* username = getenv("USER");
   char* socket_name =  (char*) calloc(strlen(username) + strlen(P_tmpdir) + 40, sizeof(char));
   strcat(socket_name, P_tmpdir);
-  strcat(socket_name, "/.tpm-");
+  if (P_tmpdir[strlen(P_tmpdir) - 1] != '/') {
+    strcat(socket_name, "/");
+  } 
+  strcat(socket_name, ".tpm-");
   strcat(socket_name, username);
   return socket_name;
 }
@@ -44,7 +47,7 @@ int ClientMain(char* done_message) {
   strcpy(remote.sun_path, socket_name);
   free(socket_name);
 
-  int len = strlen(remote.sun_path) + sizeof(remote.sun_family);
+  int len = strlen(remote.sun_path) + sizeof(remote.sun_family) + 1;
   if (connect(sock_fd, (struct sockaddr *)&remote, len) == -1) {
     printf("%s\n", done_message);
     return 0;
@@ -81,7 +84,7 @@ int DaemonMain(int countdown_time) {
         strcpy(local.sun_path, socket_name);
         unlink(local.sun_path);
         free(socket_name);
-        int len = strlen(local.sun_path) + sizeof(local.sun_family);
+        int len = strlen(local.sun_path) + sizeof(local.sun_family) + 1;
         if (bind(sock_fd, (struct sockaddr *)&local, len) == -1) {
           perror("bind");
           exit(1);
@@ -160,6 +163,8 @@ int DaemonMain(int countdown_time) {
            }
            ok = nanosleep(&ts, NULL);
         }
+   close(sock_fd);
+   printf("%s\n", local.sun_path);
    unlink(local.sun_path);
    char* post_hook = MakePostHookPath();
    if (access(post_hook, X_OK) != -1) {
@@ -173,26 +178,37 @@ int main(int argc, char** argv) {
     int c;
     int countdown_time = kDefaultLengthSecs;
     char* done_message = (char*) kDefaultDoneMessage;
-    while ( (c = getopt(argc, argv, "bs:m:d:")) != -1) {
-        switch (c) {
-        case 's':
-            countdown_time = atoi(optarg);
-            break;
-        case 'm':
-            countdown_time = atoi(optarg) * 60;
-            break;
-        case 'd':
-            done_message = optarg;
-            break;
-        }
+    int got_positional = 0;
+    char* command = "";
+    while (1) {
+      while ( (c = getopt(argc, argv, "bs:m:d:")) != -1) {
+          switch (c) {
+          case 's':
+              countdown_time = atoi(optarg);
+              break;
+          case 'm':
+              countdown_time = atoi(optarg) * 60;
+              break;
+          case 'd':
+              done_message = optarg;
+              break;
+          }
+      }
+      if (optind < argc && !got_positional) {
+          command = argv[optind];
+          got_positional = 1; 
+      } else {
+        break;
+      }
+      optind++;
     }
-    if (optind < argc) {
-        char* command = argv[optind];
-        if (strcmp(command, "start") == 0) {
-          DaemonMain(countdown_time);
-        }
-    } else {
+
+
+    if (strcmp(command, "start") == 0) {
+      DaemonMain(countdown_time);
+    }
+    else {
       return ClientMain(done_message);
     }
-    exit (0);   
+    exit(0);   
 }
