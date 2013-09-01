@@ -17,8 +17,8 @@
 using std::string;
 const int kDefaultLengthSecs = 25 * 60;
 const char* kDefaultDoneMessage = "";
-const string kSocketPrefix = "/.tpom-"
-const string kPostHookScriptName = "/.tpom-post.sh"
+const string kSocketPrefix = "/.tpom-";
+const string kPostHookScriptName = "/.tpom-post.sh";
 
 string SocketName() {
   string socket_name;
