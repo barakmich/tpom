@@ -26,7 +26,7 @@ string SocketName() {
   return socket_name;
 }
 
-string MakePostHookPath() {
+string PostHookPath() {
   string post_hook;
   post_hook = getenv("HOME");
   post_hook += "/.tpom-post.sh";
@@ -61,15 +61,17 @@ int ClientMain(string done_message) {
 }
 
 int DaemonMain(int countdown_time) {
-  /* Our process ID and Session ID */
   int ok;
   pid_t pid, sid;
+
+  // How often should we check the time? Default to 50ms.
   struct timespec ts;
   ts.tv_sec = 0;
   ts.tv_nsec = 1000 /*micro*/ * 1000 /* milli */ * 50;
 
   string socket_name = SocketName();
 
+  // Open the socket for listening.
   int sock_fd;
   struct sockaddr_un local, remote;
 
@@ -85,40 +87,35 @@ int DaemonMain(int countdown_time) {
     perror("bind");
     exit(1);
   }
+
+  // Non-blocking check to see if anyone's connected.
   int flags = fcntl(sock_fd,F_GETFL,0);
   fcntl(sock_fd, F_SETFL, flags | O_NONBLOCK);
 
-  /* Fork off the parent process */
+  // Fork off the parent process
   pid = fork();
   if (pid < 0) {
     exit(EXIT_FAILURE);
   }
-  /* If we got a good PID, then
-     we can exit the parent process. */
   if (pid > 0) {
     exit(EXIT_SUCCESS);
   }
-
-  /* Change the file mode mask */
   umask(0);
 
-  /* Open any logs here */
-
-  /* Create a new SID for the child process */
   sid = setsid();
   if (sid < 0) {
-    /* Log the failure */
     exit(EXIT_FAILURE);
   }
 
 
-  /* Change the current working directory */
+  // Change the working directory to root --
+  // it's portable and not going anywhere.
   if ((chdir("/")) < 0) {
-    /* Log the failure */
     exit(EXIT_FAILURE);
   }
 
-  /* Close out the standard file descriptors */
+  // Close out the standard file descriptors,
+  // writing on them is an error now.
   close(STDIN_FILENO);
   close(STDOUT_FILENO);
   close(STDERR_FILENO);
@@ -127,7 +124,7 @@ int DaemonMain(int countdown_time) {
     exit(1);
   }
 
-
+  // Start the timer
   struct timeval start_time;
   ok = gettimeofday(&start_time, NULL);
   int remote_fd = -1;
@@ -159,9 +156,10 @@ int DaemonMain(int countdown_time) {
     ok = nanosleep(&ts, NULL);
   }
   close(sock_fd);
-  printf("%s\n", local.sun_path);
   unlink(local.sun_path);
-  string post_hook = MakePostHookPath();
+
+  // Now we execv into the post-hook script.
+  string post_hook = PostHookPath();
   char* argv[] = {(char *)post_hook.c_str(), NULL};
   if (access(post_hook.c_str(), X_OK) != -1) {
     execv(post_hook.c_str(), argv);
@@ -175,16 +173,21 @@ int main(int argc, char** argv) {
   string done_message = kDefaultDoneMessage;
   int got_positional = 0;
   string command = "";
+
+  // This loop is a little strange -- it supports exactly one positional
+  // argument, if it exists. GNU getopt() will parse all the options first, and
+  // reorder to leave the positional arguments at the end. BSD (and OSX)
+  // getopt() won't, hence this hacky loop.
   while (1) {
     while ( (c = getopt(argc, argv, "bs:m:d:")) != -1) {
       switch (c) {
-        case 's':
+        case 's':  // seconds
           countdown_time = atoi(optarg);
           break;
-        case 'm':
+        case 'm':  // minutes
           countdown_time = atoi(optarg) * 60;
           break;
-        case 'd':
+        case 'd':  // optional done message
           done_message = optarg;
           break;
       }
@@ -198,7 +201,7 @@ int main(int argc, char** argv) {
     optind++;
   }
 
-
+  // Run the appropriate command.
   if (command == "start") {
     DaemonMain(countdown_time);
   }
