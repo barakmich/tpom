@@ -17,11 +17,13 @@
 using std::string;
 const int kDefaultLengthSecs = 25 * 60;
 const char* kDefaultDoneMessage = "";
+const string kSocketPrefix = "/.tpom-"
+const string kPostHookScriptName = "/.tpom-post.sh"
 
 string SocketName() {
   string socket_name;
   socket_name.append(P_tmpdir);
-  socket_name.append("/.tpom-");
+  socket_name.append(kSocketPrefix);
   socket_name.append(getenv("USER"));
   return socket_name;
 }
@@ -29,7 +31,7 @@ string SocketName() {
 string PostHookPath() {
   string post_hook;
   post_hook = getenv("HOME");
-  post_hook += "/.tpom-post.sh";
+  post_hook += kPostHookScriptName;
   return post_hook;
 }
 
