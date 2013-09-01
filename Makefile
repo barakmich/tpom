@@ -1,2 +1,2 @@
 all:
-	g++ -o tpm tpm.cc
+	g++ -o tpom tpom.cc

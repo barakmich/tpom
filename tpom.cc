@@ -21,7 +21,7 @@ const char* kDefaultDoneMessage = "";
 string SocketName() {
   string socket_name;
   socket_name.append(P_tmpdir);
-  socket_name.append("/.tpm-");
+  socket_name.append("/.tpom-");
   socket_name.append(getenv("USER"));
   return socket_name;
 }
@@ -29,7 +29,7 @@ string SocketName() {
 string MakePostHookPath() {
   string post_hook;
   post_hook = getenv("HOME");
-  post_hook += "/.tpm-post.sh";
+  post_hook += "/.tpom-post.sh";
   return post_hook;
 }
 
