@@ -20,9 +20,11 @@ And assuming you have g++ and a unixy system, it will just work. Nothing special
 
 #### Usage
 If you try
+
 ```
 ./tpom
 ```
+
 You'll see a blank line. This is because the timer isn't running. Try
 
 ```
@@ -30,11 +32,14 @@ You'll see a blank line. This is because the timer isn't running. Try
 ```
 
 To start the daemon for a default of 25 minutes. If you want a different amount of time try one of:
+
 ```
 ./tpom start -s 90
 ./tpom start -m 15
 ```
+
 For 90 seconds or 15 minutes, respectively. Now that it's running, run
+
 ```
 ./tpom
 ```
