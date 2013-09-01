@@ -12,30 +12,28 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <string>
+
+using std::string;
 const int kDefaultLengthSecs = 25 * 60;
 const char* kDefaultDoneMessage = "";
 
-char* MakeSocketName() {
-  char* username = getenv("USER");
-  char* socket_name =  (char*) calloc(strlen(username) + strlen(P_tmpdir) + 40, sizeof(char));
-  strcat(socket_name, P_tmpdir);
-  if (P_tmpdir[strlen(P_tmpdir) - 1] != '/') {
-    strcat(socket_name, "/");
-  } 
-  strcat(socket_name, ".tpm-");
-  strcat(socket_name, username);
+string SocketName() {
+  string socket_name;
+  socket_name.append(P_tmpdir);
+  socket_name.append("/.tpm-");
+  socket_name.append(getenv("USER"));
   return socket_name;
 }
 
-char* MakePostHookPath() {
-  char* home = getenv("HOME");
-  char* post_hook =  (char*) calloc(strlen(home) + 40, sizeof(char));
-  strcat(post_hook, home);
-  strcat(post_hook, "/.tpm-post.sh");
+string MakePostHookPath() {
+  string post_hook;
+  post_hook = getenv("HOME");
+  post_hook += "/.tpm-post.sh";
   return post_hook;
 }
 
-int ClientMain(char* done_message) {
+int ClientMain(string done_message) {
   int sock_fd;
   struct sockaddr_un remote;
   if ((sock_fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
@@ -43,13 +41,12 @@ int ClientMain(char* done_message) {
     exit(1);
   }
   remote.sun_family = AF_UNIX;
-  char * socket_name = MakeSocketName();
-  strcpy(remote.sun_path, socket_name);
-  free(socket_name);
+  string socket_name = SocketName();
+  strcpy(remote.sun_path, socket_name.c_str());
 
   int len = strlen(remote.sun_path) + sizeof(remote.sun_family) + 1;
   if (connect(sock_fd, (struct sockaddr *)&remote, len) == -1) {
-    printf("%s\n", done_message);
+    printf("%s\n", done_message.c_str());
     return 0;
   }
 
@@ -71,8 +68,8 @@ int DaemonMain(int countdown_time) {
         ts.tv_sec = 0;
         ts.tv_nsec = 1000 /*micro*/ * 1000 /* milli */ * 50;
 
-        char * socket_name = MakeSocketName();
-    
+        string socket_name = SocketName();
+
         int sock_fd;
         struct sockaddr_un local, remote;
 
@@ -81,9 +78,8 @@ int DaemonMain(int countdown_time) {
           exit(1);
         }
         local.sun_family = AF_UNIX;
-        strcpy(local.sun_path, socket_name);
+        strcpy(local.sun_path, socket_name.c_str());
         unlink(local.sun_path);
-        free(socket_name);
         int len = strlen(local.sun_path) + sizeof(local.sun_family) + 1;
         if (bind(sock_fd, (struct sockaddr *)&local, len) == -1) {
           perror("bind");
@@ -105,46 +101,45 @@ int DaemonMain(int countdown_time) {
 
         /* Change the file mode mask */
         umask(0);
-                
-        /* Open any logs here */        
-                
+
+        /* Open any logs here */
+
         /* Create a new SID for the child process */
         sid = setsid();
         if (sid < 0) {
                 /* Log the failure */
                 exit(EXIT_FAILURE);
         }
-        
-        
+
+
         /* Change the current working directory */
         if ((chdir("/")) < 0) {
                 /* Log the failure */
                 exit(EXIT_FAILURE);
         }
-        
+
         /* Close out the standard file descriptors */
         close(STDIN_FILENO);
         close(STDOUT_FILENO);
         close(STDERR_FILENO);
-        
+
         if (listen(sock_fd, 5) == -1) {
           exit(1);
         }
 
-        
-        /* The Big Loop */
-        int wakeup = 0;
+
         struct timeval start_time;
         ok = gettimeofday(&start_time, NULL);
         int remote_fd = -1;
 
+        bool wakeup = false;
         while (!wakeup) {
            struct timeval current_time;
            struct timeval diff_time;
            ok = gettimeofday(&current_time, NULL);
            timersub(&current_time, &start_time, &diff_time);
            if (diff_time.tv_sec >= countdown_time) {
-             wakeup = 1;
+             wakeup = true;
              continue;
            }
            long remaining_time = (long)countdown_time - diff_time.tv_sec;
@@ -166,20 +161,20 @@ int DaemonMain(int countdown_time) {
    close(sock_fd);
    printf("%s\n", local.sun_path);
    unlink(local.sun_path);
-   char* post_hook = MakePostHookPath();
-   if (access(post_hook, X_OK) != -1) {
-     execv(post_hook, NULL);
+   string post_hook = MakePostHookPath();
+   char* argv[0];
+   if (access(post_hook.c_str(), X_OK) != -1) {
+     execv(post_hook.c_str(), argv);
    }
-   free(post_hook);
    exit(EXIT_SUCCESS);
 }
 
 int main(int argc, char** argv) {
     int c;
     int countdown_time = kDefaultLengthSecs;
-    char* done_message = (char*) kDefaultDoneMessage;
+    string done_message = kDefaultDoneMessage;
     int got_positional = 0;
-    char* command = "";
+    string command = "";
     while (1) {
       while ( (c = getopt(argc, argv, "bs:m:d:")) != -1) {
           switch (c) {
@@ -196,7 +191,7 @@ int main(int argc, char** argv) {
       }
       if (optind < argc && !got_positional) {
           command = argv[optind];
-          got_positional = 1; 
+          got_positional = 1;
       } else {
         break;
       }
@@ -204,11 +199,11 @@ int main(int argc, char** argv) {
     }
 
 
-    if (strcmp(command, "start") == 0) {
+    if (command == "start") {
       DaemonMain(countdown_time);
     }
     else {
       return ClientMain(done_message);
     }
-    exit(0);   
+    exit(0);
 }
