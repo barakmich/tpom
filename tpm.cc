@@ -162,7 +162,7 @@ int DaemonMain(int countdown_time) {
    printf("%s\n", local.sun_path);
    unlink(local.sun_path);
    string post_hook = MakePostHookPath();
-   char* argv[0];
+   char* argv[] = {(char *)post_hook.c_str(), NULL};
    if (access(post_hook.c_str(), X_OK) != -1) {
      execv(post_hook.c_str(), argv);
    }
